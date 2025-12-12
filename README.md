@@ -1,15 +1,21 @@
-# EasyOCR Screenshot GUI v0.3 (One-page output)
+# EasyOCR Screenshot GUI v0.4 (One-page + Zoom + Loading + Timer)
 
-English-only, offline screenshot OCR using EasyOCR (CPU).
+## Features
+- One-page layout (balanced): Preview left + Text right
+- Preview toggle: Original / Overlay
+- Preview supports **zoom (mouse wheel)** + **pan (drag)**
+- Loading bar (indeterminate) while OCR is running
+- Shows OCR runtime (seconds)
+- Export: Overlay PNG / TXT / CSV
 
-## One-page Output (Balanced)
-- Balanced split: Preview (Original/Overlay) on the left + Extracted Text on the right
-- Header summary + export buttons
-- Dark mode by default
-
-## Run with uv
+## Run (uv)
 ```bash
 uv venv
 uv sync
 uv run python app.py
 ```
+
+## Controls
+- Zoom: Mouse wheel on preview
+- Pan: Left mouse drag on preview
+- Reset view: Double click on preview
