@@ -1,0 +1,15 @@
+[project]
+name = "easyocr-screenshot-gui"
+version = "0.1.0"
+description = "Offline EasyOCR (English) screenshot OCR with auto dark/light detection, overlay, and editor-like text export."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+  "easyocr>=1.7.2",
+  "opencv-python>=4.8",
+  "pillow>=10.0",
+  "customtkinter>=5.2.0",
+]
+
+[project.scripts]
+easyocr-screenshot-gui = "app:main"
