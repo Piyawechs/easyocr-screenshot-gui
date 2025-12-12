@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,7 +16,7 @@ class OCRConfig:
     gpu: bool = False
     scale: float = 2.5
 
-    # EasyOCR detection/recognition knobs (tuned for screenshots)
+    # EasyOCR knobs (tuned for screenshots)
     text_threshold: float = 0.55
     low_text: float = 0.2
     link_threshold: float = 0.35
@@ -25,11 +26,11 @@ class OCRConfig:
     # Output filtering
     min_conf: float = 0.20
 
-    # Code-focused allowlist (optional)
+    # Optional allowlist to reduce confusion on code/log screenshots
     use_allowlist: bool = True
 
 
-DEFAULT_CODE_ALLOWLIST = r"""0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_()[]{}.,=:+-*/\"'\\:;<>#@! """
+DEFAULT_CODE_ALLOWLIST = r"""0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_()[]{}.,=:+-*/\\"'\\\\:;<>#@! """
 
 
 def load_image(path: str | Path) -> np.ndarray:
@@ -49,8 +50,6 @@ def detect_theme(bgr: np.ndarray) -> str:
         return "dark"
     if mean > 165:
         return "light"
-
-    # Ambiguous: use contrast to decide
     return "dark" if mean < 140 and std > 45 else "light"
 
 
@@ -70,18 +69,11 @@ def _gamma(gray: np.ndarray, gamma: float) -> np.ndarray:
 
 
 def preprocess_for_screenshot(bgr: np.ndarray, theme: str, scale: float) -> np.ndarray:
-    """
-    Preprocess screenshot for OCR.
-    - Upscale to help tiny UI fonts.
-    - CLAHE to normalize contrast.
-    - Mild denoise + sharpen.
-    Returns a GRAY image suitable for EasyOCR.
-    """
+    """Preprocess screenshot for OCR. Returns GRAY image."""
     if abs(scale - 1.0) > 1e-6:
         bgr = cv2.resize(bgr, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
     bgr = _apply_clahe_bgr(bgr, clip_limit=2.0)
-
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 
     if theme == "dark":
@@ -99,16 +91,8 @@ def _bbox_to_rect(bbox: List[List[float]]) -> Tuple[int, int, int, int]:
     return x1, y1, x2, y2
 
 
-def group_into_lines(
-    results: List[Tuple[List[List[float]], str, float]],
-    y_tol: float,
-) -> List[str]:
-    """
-    Convert EasyOCR word boxes into editor-like lines.
-    - Sort by y then x
-    - Cluster into lines by Y proximity
-    - Sort by X within line, join by spaces
-    """
+def group_into_lines(results: List[Tuple[List[List[float]], str, float]], y_tol: float) -> List[str]:
+    """Editor-like line ordering: top-to-bottom, left-to-right."""
     items = []
     for bbox, text, conf in results:
         x1, y1, x2, y2 = _bbox_to_rect(bbox)
@@ -147,16 +131,7 @@ def draw_overlay(bgr_scaled: np.ndarray, results: List[Tuple[List[List[float]], 
         x1, y1, x2, y2 = _bbox_to_rect(bbox)
         cv2.rectangle(out, (x1, y1), (x2, y2), (0, 255, 0), 2)
         label = f"{text} ({conf:.2f})"
-        cv2.putText(
-            out,
-            label,
-            (x1, max(0, y1 - 8)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            (0, 255, 0),
-            2,
-            cv2.LINE_AA,
-        )
+        cv2.putText(out, label, (x1, max(0, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2, cv2.LINE_AA)
     return out
 
 
@@ -194,19 +169,36 @@ def run_ocr(image_path: str | Path, cfg: OCRConfig) -> dict:
 
     overlay = draw_overlay(bgr_scaled, filtered, min_conf=float(cfg.min_conf))
 
-    return {"theme": theme, "lines": lines, "results": filtered, "overlay_bgr": overlay}
+    return {
+        "theme": theme,
+        "lines": lines,
+        "results": filtered,
+        "overlay_bgr": overlay,
+        "bgr_scaled": bgr_scaled,
+    }
 
 
-def save_outputs(image_path: str | Path, out_dir: str | Path, lines: List[str], overlay_bgr: np.ndarray) -> tuple[Path, Path]:
-    image_path = Path(image_path)
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    stem = image_path.stem
-    txt_path = out_dir / f"{stem}.txt"
-    overlay_path = out_dir / f"{stem}_overlay.png"
-
+def export_txt(txt_path: str | Path, lines: List[str]) -> Path:
+    txt_path = Path(txt_path)
+    txt_path.parent.mkdir(parents=True, exist_ok=True)
     txt_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    cv2.imwrite(str(overlay_path), overlay_bgr)
+    return txt_path
 
-    return txt_path, overlay_path
+
+def export_csv(csv_path: str | Path, lines: List[str]) -> Path:
+    import csv as _csv
+    csv_path = Path(csv_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(["line_no", "text"])
+        for i, line in enumerate(lines, start=1):
+            w.writerow([i, line])
+    return csv_path
+
+
+def export_overlay_png(png_path: str | Path, overlay_bgr: np.ndarray) -> Path:
+    png_path = Path(png_path)
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(png_path), overlay_bgr)
+    return png_path

@@ -1,7 +1,7 @@
 [project]
 name = "easyocr-screenshot-gui"
-version = "0.1.0"
-description = "Offline EasyOCR (English) screenshot OCR with auto dark/light detection, overlay, and editor-like text export."
+version = "0.3.0"
+description = "Offline EasyOCR (English) screenshot OCR with auto dark/light detection, one-page output (image+text), overlay preview, and exports (TXT/CSV/overlay PNG)."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
